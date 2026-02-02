@@ -1,0 +1,8 @@
+title: Building a Chromecast Audio Clone with an ESP32
+description: Building a Chromecast Audio Clone with an ESP32
+baseurl: ""
+url: "https://yourdomain.com"
+
+# Build settings
+markdown: kramdown
+theme: minima

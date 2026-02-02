@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Building a Chromecast Audio Clone with an ESP32 | Building a Chromecast Audio Clone with an ESP32</title>
+<meta name="generator" content="Jekyll v3.10.0" />
+<meta property="og:title" content="Building a Chromecast Audio Clone with an ESP32" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Building a Chromecast Audio Clone with an ESP32" />
+<meta property="og:description" content="Building a Chromecast Audio Clone with an ESP32" />
+<link rel="canonical" href="http://localhost:4000/" />
+<meta property="og:url" content="http://localhost:4000/" />
+<meta property="og:site_name" content="Building a Chromecast Audio Clone with an ESP32" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Building a Chromecast Audio Clone with an ESP32" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","description":"Building a Chromecast Audio Clone with an ESP32","headline":"Building a Chromecast Audio Clone with an ESP32","name":"Building a Chromecast Audio Clone with an ESP32","url":"http://localhost:4000/"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="http://localhost:4000/feed.xml" title="Building a Chromecast Audio Clone with an ESP32" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Building a Chromecast Audio Clone with an ESP32</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/">Building a Chromecast Audio Clone with an ESP32</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <h1 id="building-a-chromecast-audio-clone-with-an-esp32">Building a Chromecast Audio Clone with an ESP32</h1>
+
+<p>I wanted to stream audio to my soundbar over WiFi. Google made a product for this (Chromecast Audio) but they killed it in 2019. So I built my own with an ESP32 my coworker gave me one day.</p>
+
+<p>My soundbar has three inputs: HDMI eARC (occupied by the TV), Bluetooth (too much latency/compression), and TOSLINK. So I went with TOSLINK. It turns out, all TOSLINK really does is flash light pulses. And an ESP32 flashing an LED is like the “Hello World” of embedded systems.</p>
+
+<h2 id="system-overview">System Overview</h2>
+
+<p><img src="/assets/images/esp32-system-desing.png" alt="System Overview" /></p>
+
+<h2 id="wiring--pinout">Wiring &amp; Pinout</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th><strong>Signal</strong></th>
+      <th><strong>ESP32 Pin</strong></th>
+      <th><strong>Connection</strong></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>I2S Data</strong></td>
+      <td>GPIO 22</td>
+      <td>Anode (+) of Red LED</td>
+    </tr>
+    <tr>
+      <td><strong>IR Blaster</strong></td>
+      <td>GPIO 23</td>
+      <td>IR LED (via resistor)</td>
+    </tr>
+    <tr>
+      <td><strong>Ground</strong></td>
+      <td>GND</td>
+      <td>LED Cathodes (-)</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><img src="/assets/images/ESP_Board.jpg" alt="ESP32 board with LED connections" /></p>
+
+<p>To stream the audio, I used <strong>ffmpeg</strong> to push raw PCM data over UDP.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ffmpeg <span class="nt">-re</span> <span class="nt">-i</span> file.mp3 <span class="se">\</span>
+  <span class="nt">-acodec</span> pcm_s16le <span class="nt">-ar</span> 44100 <span class="nt">-ac</span> 2 <span class="se">\</span>
+  <span class="nt">-f</span> s16le udp://esp32-spdif.local:1234
+</code></pre></div></div>
+<blockquote>
+  <p>This command converts the mp3 into raw PCM data at 44.1kHz stereo and streams it over UDP to the ESP32. The <code class="language-plaintext highlighter-rouge">-re</code> flag makes ffmpeg send the data in real-time instead of as fast as possible, which would overwhelm the buffer.</p>
+</blockquote>
+
+<h2 id="receiving-audio-over-wifi">Receiving Audio over WiFi</h2>
+
+<p>The ESP32 continuously listens for incoming audio packets over WiFi. The issue with WiFi is that it isn’t perfectly steady. Packets can arrive in bursts, get delayed, or bunch up because the router is busy doing other things. If I just played audio the instant it arrived, every tiny network hiccup would cause an audible glitch. Instead I queue the audio up in a ring buffer. A chunk of memory that smooths the process of incoming audio to output audio. It’s like a doubly linked list and processes the audio as it goes, once full it overwrites the old audio and keeps going.</p>
+
+<p>Full code can be found <a href="https://github.com/YayaADev/AudioTransmitter/blob/master/audio-transmitter.ino">AudioTransmitter</a></p>
+<h3 id="ring-buffer">Ring buffer</h3>
+
+<p>I set the ring buffer size to 256KB. At 44.1kHz stereo 16-bit (I think S/PDIF can do 96kHz but my soundbar maxes out at <a href="https://videoandaudiocenter.com/sony-hts2000-3-1ch-dolby-atmos-soundbar/#:~:text=HDMI%20eARC-,HDMI%20eARC%20connection%20and%20power%20on.,in%20favor%20of%20recycled%20materials.">48kHz</a> sI just went with the default CD number), one second of audio is 176,400 bytes (44,100 samples × 2 channels × 2 bytes), so 256KB gives roughly ~1.49 seconds of buffer. Probably overkill, could be much lower.</p>
+
+<p>I also set a minimum buffer threshold of 4KB before playback starts. I didn’t have this at first and would sometimes hear a click/pop sound which is a <a href="https://en.wikipedia.org/wiki/Buffer_underrun">buffer underrun</a> i think. When the buffer empties mid-playback there’s a sudden jump in the waveform when new audio arrives. The discontinuity is the click.</p>
+
+<p>Each loop iteration pulls 1KB chunks from the buffer to send to S/PDIF. Smaller chunks are more responsive but cost more CPU overhead. Larger chunks will bring in more latency from recieving and audio, especially on first play. 1KB felt like a reasonable middle ground.</p>
+<h3 id="udp">UDP</h3>
+
+<p>Using UDP instead of TCP since this is real time audio streaming. It would be a poor experience if on every dropped packet I let TCP do its guaranteed delivery thing. Audio pauses, buffer drains, then resumes with a larger glitch. With UDP if a packet goes missing you wouldn’t even hear it. The library <a href="https://github.com/me-no-dev/ESPAsyncUDP.git">AsyncUDP</a> handles this for me</p>
+
+<h3 id="mdns">mDNS</h3>
+
+<p>Using mDNS was a handy way for me to have a consistent name for streaming audio. The ESP gets its IP address from my router via <strong>DHCP</strong>. The router may assign a different IP after a reboot, network change, or something. I’d have to keep figuring out the new IP and change the ffmpeg command. Instead I have a consistent URL to forward audio to <code class="language-plaintext highlighter-rouge">udp://esp32-spdif.local:1234</code></p>
+
+<hr />
+
+<h2 id="understanding-spdif-and-toslink">Understanding S/PDIF and TOSLINK</h2>
+
+<p>This part took most of my time as I was over complicating it and didnt realize its actually a lot simpler than I initially thought.</p>
+
+<h3 id="spdif">S/PDIF</h3>
+
+<p>S/PDIF (Sony/Philips Digital Interface) is a standard for transmitting digital audio between devices. It was built in the 1980s to overcome the signal degradation that came with analog (at least that’s what I read, I grew up in an HDMI era). Instead of analog waveforms, S/PDIF sends audio as raw binary, just 1s and 0s.</p>
+
+<p>Digital communication usually needs a separate clock wire so devices agree on timing (<a href="https://docs.altera.com/r/docs/683798/23.4/hdmi-ip-user-guide/hdmi-intel-fpga-ip-quick-reference">HDMI</a>  does this). But S/PDIF was designed as a single wire for simpler consumer setups. The All In One audio wire.  To pack both timing and data into one wire, it uses biphase mark encoding: every bit flips the signal at least once so the receiver can track timing, and 1s get an extra flip in the middle to distinguish them from 0s.</p>
+
+<h3 id="toslink">TOSLINK</h3>
+
+<p>TOSLINK is just S/PDIF transmitted as light pulses through a fiber optic cable instead of electrical signals on a wire. It’s the same protocol, a TOSLINK transmitter converts the electrical S/PDIF signal to light (LED on/off) and receivers convert it back.</p>
+
+<h4 id="how-the-spdifoutput-library-works">How the SPDIFOutput Library Works</h4>
+
+<p>The <a href="https://github.com/pschatzmann/arduino-audio-tools.git">AudioTools (by Phil Schatzmann)</a> library handles the work of converting raw audio data into a S/PDIF signal by repurposing the I2S in the ESP32.</p>
+
+<p>The I2S is a hardware piece with three wires BCLK (Bit Clock), LRCLK (Left/right clock), DATA (the actual audio bits) and is usually used with a DAC chip. Since S/PDIF sends it all with one wire it only uses the <code class="language-plaintext highlighter-rouge">DATA</code> wire. The process is essentially this</p>
+
+<ol>
+  <li>Takes the raw PCM audio bytes.</li>
+  <li>Adds S/PDIF formatting (timing info + audio data)</li>
+  <li>Encodes it so the receiver can extract both data and timing from one signal</li>
+  <li>Sends it to the I2S</li>
+  <li>The I2S outputs the signal on GPIO 22</li>
+</ol>
+
+<hr />
+
+<h2 id="outputting-audio-with-an-led">Outputting Audio with an LED</h2>
+
+<p>At 44.1kHz, that $0.20 LED $ is flashing around 2.8 million times per second! After the audio is converted its being sent on the GPIO pin but its still an electrical signal and TOSLINK needs light. Typically you’d use a TOSLINK transmitter to convert the two like a <a href="https://www.mouser.com/ProductDetail/Toshiba/TORX1950AF?qs=gev7jUp%252BQ%252BhPDbv%252Bwuk0PA%3D%3D">TORX1950A(F)</a>. But thats boring and I wanted a DIY solution.</p>
+
+<p>It turns out that an LED is really all thats technically need to convert the electric audio signal to light. The actually conversion process is called <a href="https://en.wikipedia.org/wiki/Electroluminescence">electroluminescence</a> (this is now physics realm). The LED however is important <a href="https://en.wikipedia.org/wiki/TOSLINK">TOSLINK transmitters operate at a nominal optical wavelength of 650 nm</a>. I got a 20 pack for about $4 with these specs.</p>
+
+<p><strong>Color:</strong> Red (~630nm wavelength)</p>
+<ul>
+  <li><strong>LED Size:</strong> 3mm (T1 package)</li>
+  <li><strong>Millicandela (Brightness):</strong> 5000mcd</li>
+  <li><strong>Forward Voltage:</strong> 2.1V DC (typical)</li>
+  <li><strong>Forward Current:</strong> 20mA</li>
+  <li><strong>Viewing Angle:</strong> 60°</li>
+  <li><strong>Lens Type:</strong> Diffused, colored</li>
+</ul>
+
+<p>The wavelength here is what matters most as you need something as close to 650 as possible. A smaller LED with a viewing angle like 60 is also likely to work better as the light isnt being scattered around and more concentrated (think of your phone flashlight vs a cat laser toy). Paired that with a 68Ω resistor to run it near 20mA</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R = (V_supply - V_forward) / I_forward R = (3.3V - 2.1V) / 0.020A = 60Ω
+68 is close enough
+</code></pre></div></div>
+
+<p>The final piece was actually figuring out how do you connect the end of a TOSLINK cable to an LED? The LED is not a plug so it wont just fit inside (unless you got a <a href="https://lumileds.com/technology/led-technology/understanding-cob-leds/">COB</a> LED and can mount the LED die). The easiest solution was to get a coupler that can hold the two in place, and there was a <a href="https://www.thingiverse.com/thing:5705718">STL file available on thingiverse</a> that does exactly that!</p>
+
+<h2 id="bonus-auto-wake-up-via-ir-blaster">Bonus: Auto Wake-up via IR Blaster</h2>
+
+<p><code class="language-plaintext highlighter-rouge">[This was a separate problem I ran into after getting the audio working.]</code></p>
+
+<p>I normally use my soundbar with the TV. An HDMI eARC cable connects the two. When the TV turns on or off soundbar automatically turns on or off with it. But with a TOSLINK cable to an LED, the signal to turn on and off is not passed. The other way to turn on a soundbar is with the provided remote which sends an IR blast signal to the soundbar. I took the idea of using an IR blaster and decided to create my own IR blaster on the ESP to control the soundbar too.</p>
+
+<p>An issue I ran into was actually figuring out what the codes were. The remote bundled with the soundbar is a <a href="https://www.sony.com/electronics/support/sound-bars-home-theater-systems-sound-bars-surround-speakers/ht-s2000">RMT-AH513U</a>.</p>
+
+<p>Trying to find the codes online, I discovered there is a database that hosts all remote IR codes called <a href="https://lirc-remotes.sourceforge.net/">LIRC</a> (I also found out about <a href="https://irdb.globalcache.com/Home/Database">Global Cache</a> which looks to be a bigger repository of codes, but its mostly paid and requires an account for viewing and thats annoying). Unfortunately the data here didn’t have my specific remote available as its a bit old.</p>
+
+<p>I needed to manually figure out the codes myself with an IR receiver and send the signals to it. Luckily I had one with a built-in IR Receiver. LIRC provides a CLI tool called <a href="https://sourceforge.net/projects/lirc/">irrecord</a> to run that can capture the signals and generates a config file on the information captured. I tried to test every single button to know it just in case but sometimes during a session the CLI tool would crash and i’d have to start all over again.</p>
+
+<p>I didnt know why, maybe the receiver i have isnt great, or there was interference ? Couldn’t tell but after a few times it became too time consuming so i just tested with the buttons i care about (power, input, volume) and exited. <a href="https://gist.github.com/YayaADev/d393afb27e7f5e17e858e7b596ce9311">sony-ht-s2000.lircd.conf</a></p>
+
+<p>With the codes the second part was building the IR blaster on the ESP. This was simpler as all i needed was a IR LED and a resistor for the LED. I used a the package [IRremoteESP8266] as it supports sending IR signals.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>rsend.sendSony38(0x540C, 15, 2);
+// 0x540C - the code from the file
+// 15 - this is a 15 hex code
+// 2 - This sends the code twice. Sony needs multiple signals to turn on
+</code></pre></div></div>
+
+<h2 id="results">Results</h2>
+
+<p>I have two clips showing it in action.</p>
+
+<p><strong>Audio streaming over WiFi to the soundbar via TOSLINK:</strong></p>
+
+<video width="100%" controls="">
+  <source src="/assets/videos/VidNoIR.mp4" type="video/mp4" />
+  Your browser doesn't support the video tag.
+</video>
+
+<p>This clip shows the audio being transmitted through the LED without the coupler. The lights are dimmed to put more focus on the LED and really capture when the data is being transmitted. I ran the ffmpeg command before recording to keep the LED lit while holding the cable.</p>
+
+<p><strong>IR blaster automatically turning on the soundbar:</strong></p>
+
+<video width="100%" controls="">
+  <source src="/assets/videos/VidWithIR.mp4" type="video/mp4" />
+  Your browser doesn't support the video tag.
+</video>
+
+<p>This shows everything working together. The ESP32 is positioned directly in front of the soundbar’s IR receiver (the IR LED signal is pretty weak and needs to be close). The TOSLINK cable is held with the 3D-printed coupler to the LED. You can see the soundbar turn on and hear the audio start playing after running ffmpeg. There’s some latency between running the command and audio playing, but that’s mainly the soundbar wake-up time.</p>
+
+<p><a href="https://pixabay.com/music/dubstep-dark-cyberpunk-i-free-background-music-i-free-music-lab-release-469493/">Audio used for testing</a></p>
+
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">Building a Chromecast Audio Clone with an ESP32</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">Building a Chromecast Audio Clone with an ESP32</li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>Building a Chromecast Audio Clone with an ESP32</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
