@@ -134,19 +134,23 @@ I have two clips showing it in action.
 
 **Audio streaming over WiFi to the soundbar via TOSLINK:**
 
-<video width="100%" controls>
-  <source src="/chromecast-blog/assets/videos/VidNoIR.mp4" type="video/mp4">
-  Your browser doesn't support the video tag.
-</video>
+<div class="video-container">
+  <video controls>
+    <source src="/chromecast-blog/assets/videos/VidNoIR.mp4" type="video/mp4">
+    Your browser doesn't support the video tag.
+  </video>
+</div>
 
 This clip shows the audio being transmitted through the LED without the coupler. The lights are dimmed to put more focus on the LED and really capture when the data is being transmitted. I ran the ffmpeg command before recording to keep the LED lit while holding the cable.
 
 **IR blaster automatically turning on the soundbar:**
 
-<video width="100%" controls>
-  <source src="/chromecast-blog/assets/videos/VidWithIR.mp4" type="video/mp4">
-  Your browser doesn't support the video tag.
-</video>
+<div class="video-container">
+  <video controls>
+    <source src="/chromecast-blog/assets/videos/VidWithIR.mp4" type="video/mp4">
+    Your browser doesn't support the video tag.
+  </video>
+</div>
 
 This shows everything working together. The ESP32 is positioned directly in front of the soundbar's IR receiver (the IR LED signal is pretty weak and needs to be close). The TOSLINK cable is held with the 3D-printed coupler to the LED. You can see the soundbar turn on and hear the audio start playing after running ffmpeg. There's some latency between running the command and audio playing, but that's mainly the soundbar wake-up time.
 
