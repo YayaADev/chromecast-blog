@@ -11,7 +11,7 @@ My soundbar has three inputs: HDMI eARC (occupied by the TV), Bluetooth (too muc
 
 ## System Overview
 
-![System Overview](/assets/images/esp32-system-desing.png)
+![System Overview](/chromecast-blog/assets/images/esp32-system-desing.png)
 
 ## Wiring & Pinout
 
@@ -21,7 +21,7 @@ My soundbar has three inputs: HDMI eARC (occupied by the TV), Bluetooth (too muc
 | **IR Blaster** | GPIO 23       | IR LED (via resistor) |
 | **Ground**     | GND           | LED Cathodes (-)      |
 
-![ESP32 board with LED connections](/assets/images/ESP_Board.jpg)
+![ESP32 board with LED connections](/chromecast-blog/assets/images/ESP_Board.jpg)
 
 To stream the audio, I used **ffmpeg** to push raw PCM data over UDP.
 
@@ -135,7 +135,7 @@ I have two clips showing it in action.
 **Audio streaming over WiFi to the soundbar via TOSLINK:**
 
 <video width="100%" controls>
-  <source src="/assets/videos/VidNoIR.mp4" type="video/mp4">
+  <source src="/chromecast-blog/assets/videos/VidNoIR.mp4" type="video/mp4">
   Your browser doesn't support the video tag.
 </video>
 
@@ -144,7 +144,7 @@ This clip shows the audio being transmitted through the LED without the coupler.
 **IR blaster automatically turning on the soundbar:**
 
 <video width="100%" controls>
-  <source src="/assets/videos/VidWithIR.mp4" type="video/mp4">
+  <source src="/chromecast-blog/assets/videos/VidWithIR.mp4" type="video/mp4">
   Your browser doesn't support the video tag.
 </video>
 
